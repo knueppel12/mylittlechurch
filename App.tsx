@@ -1,249 +1,392 @@
 // App.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  useColorScheme,
+  Image,
   Pressable,
-  Animated,
+  useColorScheme,
 } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
 import LoginScreen from './LoginScreen';
+import Settings from './Settings';
+import SettingsAppearance from './SettingsAppearance';
+import SettingsPersonal from './SettingsPersonal';
+import VerseScreen from './VerseScreen'; 
+import BibleChatScreen from './BibleChatScreen';
+
+// Welcher Screen ist gerade aktiv?
+type Screen =
+  | 'login'
+  | 'home'
+  | 'settings'
+  | 'appearance'
+  | 'personal'
+  | 'verse'
+  | 'bibleChat'; 
+
+// Ansichtsmodus-Typ (global)
+export type Mode = 'light' | 'dark' | 'system';
+
+type HomeProps = {
+  onGoSettings: () => void;
+  onOpenVerse: () => void;
+  onOpenBibleChat: () => void;
+  isDark: boolean;
+};
+
+function HomeScreen({ onGoSettings, onOpenVerse, onOpenBibleChat, isDark }: HomeProps) {
+  const styles = isDark ? darkStyles : lightStyles;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* obere Sektion */}
+      <View style={styles.topSection}>
+        {/* kleines Kirchen-Icon oben */}
+        <Image
+          source={require('./assets/icons/church-logo.png')}
+          style={styles.churchIcon}
+          resizeMode="contain"
+        />
+
+        {/* Bibelvers-Karte (klickbar) */}
+        <Pressable
+          style={styles.verseCard}
+          onPress={onOpenVerse}          
+        >
+          <Text style={styles.verseTitle}>Bibelvers des Tages:</Text>
+          <Text style={styles.verseText}>
+            „Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“
+          </Text>
+        </Pressable>
+
+        {/* großer Bibel-Button */}
+        <Pressable style={styles.bigButton} onPress={onOpenBibleChat}>
+          <Image
+            source={require('./assets/icons/bibel_icon.png')}
+            style={styles.bigButtonIcon}
+            resizeMode="contain"
+          />
+        </Pressable>
+
+        {/* zwei kleine Buttons */}
+        <View style={styles.bottomRow}>
+          <Pressable style={[styles.smallButton, styles.smallButtonLeft]}>
+            <Image
+              source={require('./assets/icons/socials_icon.png')}
+              style={styles.smallButtonIcon}
+              resizeMode="contain"
+            />
+          </Pressable>
+
+          <Pressable style={[styles.smallButton, styles.smallButtonRight]}>
+            <Image
+              source={require('./assets/icons/pray_icon.png')}
+              style={styles.smallButtonIcon}
+              resizeMode="contain"
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* App-Name & Einstellungen ganz unten */}
+      <View style={styles.bottomSection}>
+        <Text style={styles.appName}>MyLittleChurch</Text>
+
+        <Pressable onPress={onGoSettings} style={styles.settingsTouch}>
+          <Text style={styles.settingsText}>Einstellungen</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
 
 export default function App() {
-  // 🔹 Hooks immer ganz oben, ohne Bedingungen
-  const systemColorScheme = useColorScheme();
-  const [darkMode, setDarkMode] = useState(systemColorScheme === 'dark');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [screen, setScreen] = useState<Screen>('login');
+  const [appearance, setAppearance] = useState<Mode>('system');
 
-  // Glow-Animation für Titel
-  const glow = useRef(new Animated.Value(0)).current;
-  const glowRadius = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 6],
-  });
+  const systemScheme = useColorScheme(); // 'light' | 'dark' | null
+  const effectiveMode: Mode =
+    appearance === 'system'
+      ? (systemScheme === 'dark' ? 'dark' : 'light')
+      : appearance;
 
-  // Screen-Animation (0 = Login, 1 = Dashboard)
-  const screenAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(glow, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-      ]),
-    ).start();
-  }, [glow]);
-
-  useEffect(() => {
-    Animated.timing(screenAnim, {
-      toValue: isLoggedIn ? 1 : 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [isLoggedIn, screenAnim]);
-
-  const theme = darkMode ? darkStyles : lightStyles;
-
-  const loginOpacity = screenAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const loginTranslateX = screenAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -40],
-  });
-
-  const dashboardOpacity = screenAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-  const dashboardTranslateX = screenAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [40, 0],
-  });
+  const isDark = effectiveMode === 'dark';
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1 }}>
-        {/* LOGIN-SCREEN */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              opacity: loginOpacity,
-              transform: [{ translateX: loginTranslateX }],
-            },
-          ]}
-          pointerEvents={isLoggedIn ? 'none' : 'auto'}
-        >
-          <LoginScreen onLogin={() => setIsLoggedIn(true)} />
-        </Animated.View>
+      {screen === 'login' && (
+        <LoginScreen
+          onLogin={() => setScreen('home')}
+          appearance={appearance}
+          onChangeAppearance={setAppearance}
+        />
+      )}
 
-        {/* DASHBOARD */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            theme.container,
-            {
-              opacity: dashboardOpacity,
-              transform: [{ translateX: dashboardTranslateX }],
-            },
-          ]}
-          pointerEvents={isLoggedIn ? 'auto' : 'none'}
-        >
-          <Animated.Text
-            style={[
-              theme.title,
-              {
-                textShadowColor: darkMode ? '#000000' : '#FFFFFF',
-                shadowOpacity: 0.4,
-                textShadowOffset: { width: -2, height: 4 },
-                textShadowRadius: glowRadius as unknown as number,
-              },
-            ]}
-          >
-            Welcome Back 👋
-          </Animated.Text>
+      {screen === 'home' && (
+        <HomeScreen
+          onGoSettings={() => setScreen('settings')}
+          onOpenVerse={() => setScreen('verse')} 
+          onOpenBibleChat={() => setScreen('bibleChat')}
+          isDark={isDark}
+        />
+      )}
 
-          <Text style={theme.subtitle}>You are logged in</Text>
+      {screen === 'settings' && (
+        <Settings
+          onBack={() => setScreen('home')}
+          onLogout={() => setScreen('login')}
+          onOpenAppearance={() => setScreen('appearance')}
+          onOpenPersonal={() => setScreen('personal')}
+          isDarkMode={isDark}
+        />
+      )}
 
-          <Pressable
-            style={theme.button}
-            onPress={() => setIsLoggedIn(false)}
-            android_ripple={{ color: darkMode ? '#333' : '#ccc' }}
-          >
-            <Text style={theme.buttonText}>Logout</Text>
-          </Pressable>
+      {screen === 'appearance' && (
+        <SettingsAppearance
+          currentMode={appearance}
+          onChangeMode={(m: Mode) => setAppearance(m)}
+          onBack={() => setScreen('settings')}
+        />
+      )}
 
-          <Pressable
-            style={theme.darkmodebutton}
-            onPress={() => setDarkMode(prev => !prev)}
-          >
-            <Text
-              style={{ color: darkMode ? 'white' : 'black', fontSize: 20 }}
-            >
-              {darkMode ? '☀️' : '🌙'}
-            </Text>
-          </Pressable>
-        </Animated.View>
-      </View>
+      {screen === 'personal' && (
+        <SettingsPersonal
+          onBack={() => setScreen('settings')}
+          isDarkMode={isDark}
+        />
+      )}
+
+      {screen === 'verse' && (                        // ⭐ NEU
+        <VerseScreen
+          onBack={() => setScreen('home')}
+          isDarkMode={isDark}
+        />
+      )}
+
+      {screen === 'bibleChat' && (
+        <BibleChatScreen
+          onBack={() => setScreen('home')}
+          isDarkMode={isDark}
+        />
+      )}
     </SafeAreaProvider>
   );
 }
 
-// Styles im Tap-It-Style
-const lightStyles = StyleSheet.create({
+/* ------------ BASIS-STYLES (abgeleitet) --------------- */
+
+const base = {
   container: {
     flex: 1,
-    backgroundColor: '#BFDBFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+    justifyContent: 'space-between' as const,
   },
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: 'black',
+  topSection: {
+    alignItems: 'center' as const,
   },
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 40,
-    color: '#1e293b',
+  churchIcon: {
+    width: 60,
+    height: 60,
+    marginBottom: 10,
+    tintColor: '#ffffff',
   },
-  button: {
-    backgroundColor: '#5a92ea',
-    paddingVertical: 14,
-    borderRadius: 10,
-    width: 170,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 8,
+  verseCard: {
+    width: '100%' as const,
+    borderRadius: 28,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     marginTop: 20,
+    marginBottom: 32,
+    shadowOffset: { width: 0, height: 6 } as const,
+    shadowOpacity: 0.7,
+    shadowRadius: 5,
+    elevation: 12,
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  verseTitle: {
+    fontSize: 20,
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    marginBottom: 12,
   },
-  darkmodebutton: {
-    marginTop: 60,
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
+  verseText: {
+    fontSize: 16,
+    textAlign: 'center' as const,
+    lineHeight: 22,
+  },
+  bigButton: {
+    width: '100%' as const,
+    borderRadius: 32,
+    paddingVertical: 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 28,
+    shadowOffset: { width: 0, height: 8 } as const,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  bigButtonIcon: {
+    width: 140,
+    height: 140,
+    tintColor: '#ffffff',
+  },
+  bottomRow: {
+    flexDirection: 'row' as const,
+    width: '100%' as const,
+    justifyContent: 'space-between' as const,
+  },
+  smallButton: {
+    flex: 1,
+    borderRadius: 24,
+    paddingVertical: 26,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    shadowOffset: { width: 0, height: 6 } as const,
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
     elevation: 8,
+  },
+  smallButtonIcon: {
+    width: 80,
+    height: 80,
+    tintColor: '#ffffff',
+  },
+  bottomSection: {
+    alignItems: 'center' as const,
+  },
+  appName: {
+    fontSize: 22,
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  },
+  settingsTouch: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  settingsText: {
+    fontSize: 14,
+  },
+};
+
+/* ------------ DARK MODE --------------- */
+
+const darkStyles = StyleSheet.create({
+  container: {
+    ...base.container,
+    backgroundColor: '#111827',
+  },
+  topSection: base.topSection,
+  churchIcon: {
+    ...base.churchIcon,
+    tintColor: '#ffffff',
+  },
+  verseCard: {
+    ...base.verseCard,
+    backgroundColor: '#000000',
+    shadowColor: '#ffffffff',
+  },
+  verseTitle: {
+    ...base.verseTitle,
+    color: '#ffffff',
+  },
+  verseText: {
+    ...base.verseText,
+    color: '#e5e7eb',
+  },
+  bigButton: {
+    ...base.bigButton,
+    backgroundColor: '#FF7F3F',
+    shadowColor: '#000000',
+  },
+  bigButtonIcon: base.bigButtonIcon,
+  bottomRow: base.bottomRow,
+  smallButton: {
+    ...base.smallButton,
+    shadowColor: '#000000',
+  },
+  smallButtonLeft: {
+    backgroundColor: '#45D37A',
+    marginRight: 12,
+    paddingVertical: 4,
+  },
+  smallButtonRight: {
+    backgroundColor: '#5AA0F3',
+    marginLeft: 12,
+    paddingVertical: 4,
+  },
+  smallButtonIcon: base.smallButtonIcon,
+  bottomSection: base.bottomSection,
+  appName: {
+    ...base.appName,
+    color: '#ffffff',
+  },
+  settingsTouch: base.settingsTouch,
+  settingsText: {
+    ...base.settingsText,
+    color: '#9ca3af',
   },
 });
 
-const darkStyles = StyleSheet.create({
-  ...lightStyles,
+/* ------------ LIGHT MODE --------------- */
+
+const lightStyles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#1c1c1c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    ...base.container,
+    backgroundColor: '#f3f4f6',
   },
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: 'white',
+  topSection: base.topSection,
+  churchIcon: {
+    ...base.churchIcon,
+    tintColor: '#111827',
   },
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 40,
-    color: '#ccc',
+  verseCard: {
+    ...base.verseCard,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
   },
-  button: {
-    backgroundColor: '#5a92ea',
-    paddingVertical: 14,
-    borderRadius: 10,
-    width: 170,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
-    elevation: 8,
-    marginTop: 20,
+  verseTitle: {
+    ...base.verseTitle,
+    color: '#111827',
   },
-  darkmodebutton: {
-    marginTop: 60,
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 8,
+  verseText: {
+    ...base.verseText,
+    color: '#374151',
+  },
+  bigButton: {
+    ...base.bigButton,
+    backgroundColor: '#FF7F3F',
+    shadowColor: '#000000',
+  },
+  bigButtonIcon: base.bigButtonIcon,
+  bottomRow: base.bottomRow,
+  smallButton: {
+    ...base.smallButton,
+    shadowColor: '#9ca3af',
+  },
+  smallButtonLeft: {
+    backgroundColor: '#45D37A',
+    marginRight: 12,
+    paddingVertical: 4,
+  },
+  smallButtonRight: {
+    backgroundColor: '#5AA0F3',
+    marginLeft: 12,
+    paddingVertical: 4,
+  },
+  smallButtonIcon: base.smallButtonIcon,
+  bottomSection: base.bottomSection,
+  appName: {
+    ...base.appName,
+    color: '#111827',
+  },
+  settingsTouch: base.settingsTouch,
+  settingsText: {
+    ...base.settingsText,
+    color: '#6b7280',
   },
 });

@@ -1,5 +1,5 @@
 // LoginScreen.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,31 @@ import {
   Alert,
 } from 'react-native';
 
+// muss zu deinem Mode-Typ in App.tsx passen
+export type Mode = 'light' | 'dark' | 'system';
+
 type LoginScreenProps = {
   onLogin: () => void;
+  appearance: Mode;
+  onChangeAppearance: (mode: Mode) => void;
 };
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
-  const systemColorScheme = useColorScheme();
-  const [darkMode, setDarkMode] = useState(systemColorScheme === 'dark');
+export default function LoginScreen({
+  onLogin,
+  appearance,
+  onChangeAppearance,
+}: LoginScreenProps) {
+  const systemColorScheme = useColorScheme(); // 'light' | 'dark' | null
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // effektiver Modus inkl. "System"
+  const effective =
+    appearance === 'system' ? systemColorScheme ?? 'light' : appearance;
 
-  const placeholderColor = darkMode ? '#000' : '#6b7280';
-  const theme = darkMode ? darkStyles : lightStyles;
-  const iconTint = darkMode ? 'white' : 'black';
+  const isDark = effective === 'dark';
+
+  const placeholderColor = isDark ? '#000' : '#6b7280';
+  const theme = isDark ? darkStyles : lightStyles;
+  const iconTint = isDark ? 'white' : 'black';
 
   // Glow Animation
   const glow = useRef(new Animated.Value(0)).current;
@@ -53,6 +63,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   }, [glow]);
 
   // Login Handler
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Fehler', 'Bitte E-Mail und Passwort eingeben.');
@@ -82,14 +96,17 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   };
 
-  // Register Button (noch nicht implementiert)
   const handleRegister = () => {
     Alert.alert('Info', 'Registrierung ist noch nicht implementiert.');
   };
 
+  // Toggle: wechselt nur zwischen Hell und Dunkel
+  const toggleAppearance = () => {
+    onChangeAppearance(isDark ? 'light' : 'dark');
+  };
+
   return (
     <View style={theme.container}>
-
       {/* Logo + Titel */}
       <View style={theme.logoContainer}>
         <Image
@@ -102,7 +119,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           style={[
             theme.title,
             {
-              textShadowColor: darkMode ? '#000000' : '#000000',
+              textShadowColor: '#000000',
               shadowOpacity: 0.4,
               textShadowOffset: { width: -2, height: 4 },
               textShadowRadius: glowRadius as unknown as number,
@@ -127,7 +144,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       {/* Password Input */}
       <TextInput
         style={theme.input}
-        placeholder="Password"
+        placeholder="Passwort"
         placeholderTextColor={placeholderColor}
         secureTextEntry
         value={password}
@@ -135,10 +152,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       />
 
       {/* Buttons */}
-      <Pressable style={theme.button} onPress={handleRegister}>
-        <Text style={theme.buttonText}>register</Text>
-      </Pressable>
-
       <Pressable
         style={theme.button}
         onPress={handleLogin}
@@ -149,18 +162,18 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         </Text>
       </Pressable>
 
+      <Pressable style={theme.button} onPress={handleRegister}>
+        <Text style={theme.buttonText}>register</Text>
+      </Pressable>
+
       {/* Darkmode Toggle */}
-      <Pressable
-        style={theme.darkmodebutton}
-        onPress={() => setDarkMode(prev => !prev)}
-      >
+      <Pressable style={theme.darkmodebutton} onPress={toggleAppearance}>
         <Image
           source={require('./assets/icons/darkmode-icon.png')}
           style={{ width: 40, height: 40, tintColor: iconTint }}
           resizeMode="contain"
         />
       </Pressable>
-
     </View>
   );
 }
@@ -176,12 +189,10 @@ const lightStyles = StyleSheet.create({
     backgroundColor: '#707070ff',
     alignItems: 'center',
   },
-
   logoContainer: {
     alignItems: 'center',
     marginBottom: 40,
   },
-
   logo: {
     width: 80,
     height: 80,
@@ -191,7 +202,6 @@ const lightStyles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 4,
   },
-
   title: {
     fontSize: 42,
     fontWeight: 'bold',
@@ -199,7 +209,6 @@ const lightStyles = StyleSheet.create({
     textAlign: 'center',
     color: 'white',
   },
-
   input: {
     backgroundColor: 'white',
     padding: 14,
@@ -216,7 +225,6 @@ const lightStyles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
   },
-
   button: {
     backgroundColor: '#1c1c1c',
     paddingVertical: 14,
@@ -231,14 +239,12 @@ const lightStyles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 8,
   },
-
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
     fontSize: 16,
   },
-
   darkmodebutton: {
     backgroundColor: '#FFFFFF',
     paddingVertical: 10,
@@ -261,23 +267,13 @@ const lightStyles = StyleSheet.create({
 ────────────────────────────────────────────── */
 const darkStyles = StyleSheet.create({
   ...lightStyles,
-
   container: {
     flex: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#1c1c1c',
+    backgroundColor: '#111827',
     alignItems: 'center',
   },
-
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    textAlign: 'center',
-    color: 'white',
-  },
-
   input: {
     backgroundColor: '#f0f0f0ca',
     padding: 14,
@@ -294,7 +290,6 @@ const darkStyles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
   },
-
   button: {
     backgroundColor: '#707070ff',
     paddingVertical: 14,
@@ -309,7 +304,6 @@ const darkStyles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 8,
   },
-
   darkmodebutton: {
     backgroundColor: '#000',
     paddingVertical: 10,
