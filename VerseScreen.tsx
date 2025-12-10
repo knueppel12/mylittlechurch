@@ -70,6 +70,9 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
   const [isFlashVisible, setIsFlashVisible] = useState(false);
   const shutterScale = useRef(new Animated.Value(1)).current;
 
+  // Flash-Status
+  const [flashEnabled, setFlashEnabled] = useState(false);
+
   // useCameraDevices: bei dir als Array typisiert → als Array behandeln
   const devices = useCameraDevices(); // CameraDevice[]
   const backCamera = Array.isArray(devices)
@@ -190,7 +193,7 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
       setTimeout(() => setIsFlashVisible(false), 120);
 
       const photo = await cameraRef.current.takePhoto({
-        flash: 'off',
+        flash: flashEnabled ? 'on' : 'off',
       });
 
       const uri = photo?.path ? `file://${photo.path}` : undefined;
@@ -387,6 +390,31 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                           </Text>
                         </Pressable>
                       )}
+
+                      {/* Flash Button – rechts, mit flash-icon.png */}
+                      <Pressable
+                        onPress={() => setFlashEnabled(v => !v)}
+                        style={[
+                          styles.flashButton,
+                          flashEnabled
+                            ? {
+                                backgroundColor: isDarkMode ? '#ffffff' : '#111827',
+                              }
+                            : { backgroundColor: uiPalette.headerButtonBg },
+                          { position: 'absolute', right: '20%' },
+                        ]}
+                      >
+                        <Image
+                          source={require('./assets/icons/flash-icon.png')}
+                          style={[
+                            styles.flashIcon,
+                            flashEnabled
+                              ? { tintColor: isDarkMode ? '#111827' : '#ffffff' }
+                              : { tintColor: uiPalette.headerIcon },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      </Pressable>
 
                       {/* Capture Button – IMMER zentriert */}
                       <Animated.View
@@ -609,6 +637,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  flashButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flashIcon: {
+    width: 28,
+    height: 28,
+  },
+
   captureButton: {
     width: 72,
     height: 72,
@@ -623,7 +663,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureIcon: {
-    width: 46,
-    height: 46,
+    width: 70,
+    height: 70,
   },
 });
