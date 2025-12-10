@@ -1,5 +1,5 @@
 // VerseScreen.tsx
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,55 +10,71 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   LayoutChangeEvent,
+  Alert,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Kamera (react-native-vision-camera)
+import { Camera, useCameraDevices } from 'react-native-vision-camera';
 
 type VerseScreenProps = {
   onBack: () => void;
   isDarkMode: boolean;
 };
 
-const CARD_COUNT = 6;
-
 const CARD_CONTENT = [
   {
     title: 'Kamera-Vorlage',
     text: 'Öffne deine Kamera, um ein Foto als Hintergrund zu machen.',
-    showCameraButton: true,
   },
   {
     title: 'Bibelvers des Tages:',
     text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
-    showCameraButton: false,
   },
   {
     title: 'Bibelvers des Tages:',
     text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
-    showCameraButton: false,
   },
   {
     title: 'Design 4',
     text: 'Hier entsteht später ein weiteres Kartendesign.',
-    showCameraButton: false,
   },
   {
     title: 'Design 5',
     text: 'Hier entsteht später ein weiteres Kartendesign.',
-    showCameraButton: false,
   },
   {
     title: 'Design 6',
     text: 'Hier entsteht später ein weiteres Kartendesign.',
-    showCameraButton: false,
   },
 ];
 
+const CARD_COUNT = CARD_CONTENT.length;
+
 const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
-  // wir *wollen* auf Card 2 starten
+  // Start auf Card 2
   const [activeIndex, setActiveIndex] = useState(1);
   const [pageHeight, setPageHeight] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
-  const hasInitialScroll = useRef(false); // damit wir nur einmal automatisch scrollen
+  const hasInitialScroll = useRef(false);
+
+  // Kamera-Status
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const hasRequestedPermission = useRef(false);
+  const cameraRef = useRef<Camera | null>(null);
+
+  // Foto & Animation
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isFlashVisible, setIsFlashVisible] = useState(false);
+  const shutterScale = useRef(new Animated.Value(1)).current;
+
+  // useCameraDevices: bei dir als Array typisiert → als Array behandeln
+  const devices = useCameraDevices(); // CameraDevice[]
+  const backCamera = Array.isArray(devices)
+    ? devices.find(d => d.position === 'back')
+    : undefined;
 
   // UI-Farben – Hintergrund, Buttons, Dots
   const uiPalette = isDarkMode
@@ -87,8 +103,6 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
     title: '#f9fafb',
     text: '#f9fafb',
     footer: '#f9fafb',
-    cameraBg: '#3b82f6',
-    cameraText: '#ffffff',
   };
 
   const lightCard = {
@@ -98,8 +112,6 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
     title: '#020617',
     text: '#1f2937',
     footer: '#020617',
-    cameraBg: '#e5e7eb',
-    cameraText: '#111827',
   };
 
   const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -121,8 +133,83 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
     }
   };
 
-  const onCameraPress = () => {
-    console.log('Kamera öffnen');
+  // Kamera automatisch an/aus je nach aktiver Card
+  useEffect(() => {
+    // auf anderen Cards Kamera stoppen, Foto aber behalten
+    if (activeIndex !== 0) {
+      setIsCameraActive(false);
+      return;
+    }
+
+    (async () => {
+      if (!hasRequestedPermission.current) {
+        const status = (await Camera.requestCameraPermission()) as any;
+        hasRequestedPermission.current = true;
+
+        if (status !== 'authorized' && status !== 'granted') {
+          setHasCameraPermission(false);
+          setIsCameraActive(false);
+          Alert.alert(
+            'Kamera nicht verfügbar',
+            'Bitte erlaube der App den Kamerazugriff in den iOS-Einstellungen.'
+          );
+          return;
+        }
+
+        setHasCameraPermission(true);
+      }
+
+      // nur Live-Kamera starten, wenn noch KEIN Foto existiert
+      if (hasCameraPermission !== false && !photoUri) {
+        setIsCameraActive(true);
+      }
+    })();
+  }, [activeIndex, hasCameraPermission, photoUri]);
+
+  // Foto aufnehmen
+  const handleCapture = async () => {
+    if (!cameraRef.current) return;
+
+    try {
+      // kleine Button-Bounce Animation
+      Animated.sequence([
+        Animated.timing(shutterScale, {
+          toValue: 0.85,
+          duration: 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shutterScale, {
+          toValue: 1,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // kurzer weißer Flash
+      setIsFlashVisible(true);
+      setTimeout(() => setIsFlashVisible(false), 120);
+
+      const photo = await cameraRef.current.takePhoto({
+        flash: 'off',
+      });
+
+      const uri = photo?.path ? `file://${photo.path}` : undefined;
+      if (uri) {
+        setPhotoUri(uri);
+        // Live-Bild aus → man sieht das Foto als Hintergrund
+        setIsCameraActive(false);
+      }
+    } catch (e) {
+      console.warn('Fehler beim Foto aufnehmen:', e);
+    }
+  };
+
+  // Wiederholen-Pfeil → Foto löschen & Live-Kamera wieder aktivieren
+  const handleRetake = () => {
+    setPhotoUri(null);
+    if (activeIndex === 0 && hasCameraPermission !== false && backCamera) {
+      setIsCameraActive(true);
+    }
   };
 
   return (
@@ -174,6 +261,14 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
               // Card 2 bekommt invertiertes Layout
               const cardThemeIsDark = index === 2 ? !isDarkMode : isDarkMode;
               const cardPalette = cardThemeIsDark ? darkCard : lightCard;
+              const isCameraCard = index === 0;
+
+              const showPhotoBackground = isCameraCard && photoUri;
+              const showLiveCamera =
+                isCameraCard &&
+                isCameraActive &&
+                hasCameraPermission !== false &&
+                backCamera;
 
               return (
                 <View
@@ -193,6 +288,45 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                       },
                     ]}
                   >
+                    {/* Hintergrund: Foto oder Kamera nur auf Card 0 */}
+                    {showPhotoBackground && (
+                      <Image
+                        source={{ uri: photoUri! }}
+                        style={StyleSheet.absoluteFill}
+                        resizeMode="cover"
+                      />
+                    )}
+
+                    {!showPhotoBackground && showLiveCamera && (
+                      <View style={StyleSheet.absoluteFill}>
+                        <Camera
+                          ref={cameraRef}
+                          style={StyleSheet.absoluteFill}
+                          device={backCamera!}
+                          isActive={true}
+                          photo={true} // wichtig für takePhoto()
+                        />
+                        {/* Abdunklung für bessere Lesbarkeit */}
+                        <View
+                          style={[
+                            StyleSheet.absoluteFillObject,
+                            { backgroundColor: 'rgba(0,0,0,0.25)' },
+                          ]}
+                        />
+                      </View>
+                    )}
+
+                    {/* Weißer Shutter-Flash über Foto/Kamera */}
+                    {isCameraCard && isFlashVisible && (
+                      <View
+                        style={[
+                          StyleSheet.absoluteFillObject,
+                          { backgroundColor: 'rgba(255,255,255,0.55)' },
+                        ]}
+                      />
+                    )}
+
+                    {/* Vordergrund-Inhalt */}
                     <Image
                       source={require('./assets/icons/church-logo.png')}
                       style={[styles.cardLogo, { tintColor: cardPalette.logo }]}
@@ -217,25 +351,6 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                       {card.text}
                     </Text>
 
-                    {card.showCameraButton && (
-                      <Pressable
-                        style={[
-                          styles.cameraButton,
-                          { backgroundColor: cardPalette.cameraBg },
-                        ]}
-                        onPress={onCameraPress}
-                      >
-                        <Text
-                          style={[
-                            styles.cameraButtonText,
-                            { color: cardPalette.cameraText },
-                          ]}
-                        >
-                          Kamera öffnen
-                        </Text>
-                      </Pressable>
-                    )}
-
                     <Text
                       style={[
                         styles.cardFooter,
@@ -245,6 +360,60 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                       MyLittleChurch
                     </Text>
                   </View>
+
+                  {/* Kamera-Controls nur auf Kamera-Card (Index 0) */}
+                  {isCameraCard && hasCameraPermission !== false && (
+                    <View style={styles.cameraControlsRow}>
+                      {/* Retake Button – links, absolut positioniert */}
+                      {photoUri && (
+                        <Pressable
+                          style={[
+                            styles.retakeButton,
+                            {
+                              backgroundColor: uiPalette.headerButtonBg,
+                              position: 'absolute',
+                              left: '20%',
+                            },
+                          ]}
+                          onPress={handleRetake}
+                        >
+                          <Text
+                            style={[
+                              styles.retakeIcon,
+                              { color: uiPalette.headerIcon },
+                            ]}
+                          >
+                            ↻
+                          </Text>
+                        </Pressable>
+                      )}
+
+                      {/* Capture Button – IMMER zentriert */}
+                      <Animated.View
+                        style={[
+                          styles.captureButton,
+                          {
+                            transform: [{ scale: shutterScale }],
+                            backgroundColor: uiPalette.headerButtonBg,
+                          },
+                        ]}
+                      >
+                        <Pressable
+                          onPress={handleCapture}
+                          style={styles.captureInner}
+                        >
+                          <Image
+                            source={require('./assets/icons/capture-icon.png')}
+                            style={[
+                              styles.captureIcon,
+                              { tintColor: uiPalette.headerIcon },
+                            ]}
+                            resizeMode="contain"
+                          />
+                        </Pressable>
+                      </Animated.View>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -316,7 +485,7 @@ export default VerseScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 12, // etwas weniger Rand – Cards dürfen breiter sein
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 20,
   },
@@ -364,8 +533,8 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    width: '82%', // größer
-    height: '82%', // höher
+    width: '82%',
+    height: '82%',
     borderRadius: 32,
     paddingVertical: 32,
     paddingHorizontal: 24,
@@ -375,6 +544,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 18,
     elevation: 18,
+    overflow: 'hidden', // Kamera/Foto bleibt in der Card
   },
   cardLogo: {
     width: 46,
@@ -400,17 +570,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  cameraButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 26,
-    borderRadius: 999,
-    marginBottom: 24,
-  },
-  cameraButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
   dotsContainer: {
     width: 5,
     alignItems: 'center',
@@ -429,5 +588,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 16,
+  },
+
+  cameraControlsRow: {
+    width: '100%',
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  retakeButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retakeIcon: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+
+  captureButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureInner: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureIcon: {
+    width: 46,
+    height: 46,
   },
 });
