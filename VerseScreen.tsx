@@ -12,6 +12,7 @@ import {
   LayoutChangeEvent,
   Alert,
   Animated,
+  ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -37,20 +38,34 @@ const CARD_CONTENT = [
     text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
   },
   {
-    title: 'Design 4',
-    text: 'Hier entsteht später ein weiteres Kartendesign.',
+    title: 'Bibelvers des Tages:',
+    text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
   },
   {
-    title: 'Design 5',
-    text: 'Hier entsteht später ein weiteres Kartendesign.',
+    title: 'Bibelvers des Tages:',
+    text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
   },
   {
-    title: 'Design 6',
-    text: 'Hier entsteht später ein weiteres Kartendesign.',
+    title: 'Bibelvers des Tages:',
+    text: '„Wer anderen eine Gräbe grubt, sich selber in die Hose pupt.“',
   },
 ];
 
 const CARD_COUNT = CARD_CONTENT.length;
+
+// Hilfsfunktion: Pattern-Hintergrund je Card
+const getPatternSource = (index: number): ImageSourcePropType | null => {
+  switch (index) {
+    case 3:
+      return require('./assets/backgrounds/bg-green-pattern.png');
+    case 4:
+      return require('./assets/backgrounds/bg-blue-diagonal.png');
+    case 5:
+      return require('./assets/backgrounds/bg-orange-spiral.png');
+    default:
+      return null;
+  }
+};
 
 const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
   // Start auf Card 2
@@ -60,7 +75,9 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
   const hasInitialScroll = useRef(false);
 
   // Kamera-Status
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(
+    null
+  );
   const [isCameraActive, setIsCameraActive] = useState(false);
   const hasRequestedPermission = useRef(false);
   const cameraRef = useRef<Camera | null>(null);
@@ -263,8 +280,21 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
             {CARD_CONTENT.map((card, index) => {
               // Card 2 bekommt invertiertes Layout
               const cardThemeIsDark = index === 2 ? !isDarkMode : isDarkMode;
-              const cardPalette = cardThemeIsDark ? darkCard : lightCard;
+              const basePalette = cardThemeIsDark ? darkCard : lightCard;
+
               const isCameraCard = index === 0;
+              const isPatternCard = index >= 3; // 4–6
+
+              // Pattern-Cards immer mit weißer Typo unabhängig vom Mode
+              const cardPalette = isPatternCard
+                ? {
+                    ...basePalette,
+                    logo: '#ffffff',
+                    title: '#ffffff',
+                    text: '#ffffff',
+                    footer: '#ffffff',
+                  }
+                : basePalette;
 
               const showPhotoBackground = isCameraCard && photoUri;
               const showLiveCamera =
@@ -272,6 +302,8 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                 isCameraActive &&
                 hasCameraPermission !== false &&
                 backCamera;
+
+              const patternSource = getPatternSource(index);
 
               return (
                 <View
@@ -291,16 +323,28 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                       },
                     ]}
                   >
+                    {/* Pattern-Hintergrund für Design 4–6 */}
+                    {patternSource && (
+                      <>
+                        <Image
+                          source={patternSource}
+                          style={styles.patternBackground}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.patternOverlay} />
+                      </>
+                    )}
+
                     {/* Hintergrund: Foto oder Kamera nur auf Card 0 */}
                     {showPhotoBackground && (
                       <Image
                         source={{ uri: photoUri! }}
-                        style={StyleSheet.absoluteFill}
+                        style={styles.patternBackground}
                         resizeMode="cover"
                       />
                     )}
 
-                    {!showPhotoBackground && showLiveCamera && (
+                    {!showPhotoBackground && showLiveCamera && !patternSource && (
                       <View style={StyleSheet.absoluteFill}>
                         <Camera
                           ref={cameraRef}
@@ -391,7 +435,7 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
                         </Pressable>
                       )}
 
-                      {/* Flash Button – rechts, mit flash-icon.png */}
+                      {/* Flash Button – rechts, mit flash-icon */}
                       <Pressable
                         onPress={() => setFlashEnabled(v => !v)}
                         style={[
@@ -572,8 +616,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 18,
     elevation: 18,
-    overflow: 'hidden', // Kamera/Foto bleibt in der Card
+    overflow: 'hidden', // alles (Kamera/Pattern) bleibt in der Card
   },
+
+  // Pattern-/Foto-Hintergrund
+  patternBackground: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+  },
+  patternOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.16)', // leicht abdunkeln für Text-Kontrast
+  },
+
   cardLogo: {
     width: 46,
     height: 46,

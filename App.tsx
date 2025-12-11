@@ -287,7 +287,7 @@ const darkStyles = StyleSheet.create({
   },
   verseCard: {
     ...base.verseCard,
-    backgroundColor: '#000000',
+    backgroundColor: '#020617',
     shadowColor: '#ffffffff',
   },
   verseTitle: {
