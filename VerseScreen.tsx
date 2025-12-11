@@ -13,6 +13,9 @@ import {
   Alert,
   Animated,
   ImageSourcePropType,
+  NativeModules,
+  NativeEventEmitter,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -52,6 +55,14 @@ const CARD_CONTENT = [
 ];
 
 const CARD_COUNT = CARD_CONTENT.length;
+
+// Native iOS-Modul für die Lautstärke-Tasten
+const VolumeButtonNativeModule =
+  Platform.OS === 'ios' ? NativeModules.VolumeButtonHandler : null;
+
+const volumeButtonEmitter = VolumeButtonNativeModule
+  ? new NativeEventEmitter(VolumeButtonNativeModule)
+  : null;
 
 // Hilfsfunktion: Pattern-Hintergrund je Card
 const getPatternSource = (index: number): ImageSourcePropType | null => {
@@ -223,6 +234,21 @@ const VerseScreen: React.FC<VerseScreenProps> = ({ onBack, isDarkMode }) => {
       console.warn('Fehler beim Foto aufnehmen:', e);
     }
   };
+
+  // Volume-Buttons → Capture auslösen (nur iOS, nur Kamera-Card)
+  useEffect(() => {
+    if (!volumeButtonEmitter || !VolumeButtonNativeModule) return;
+
+    const sub = volumeButtonEmitter.addListener('onVolumeButtonPress', () => {
+      if (activeIndex === 0) {
+        handleCapture();
+      }
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [activeIndex, handleCapture]);
 
   // Wiederholen-Pfeil → Foto löschen & Live-Kamera wieder aktivieren
   const handleRetake = () => {
